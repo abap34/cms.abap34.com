@@ -18,6 +18,13 @@ export interface GitHubFile {
   type: string;
 }
 
+interface GitHubTreeEntry {
+  path: string;
+  sha: string;
+  size: number;
+  type: string;
+}
+
 // ---------------------------------------------------------------------------
 // In-memory cache (survives across requests in the same serverless instance)
 // ---------------------------------------------------------------------------
@@ -143,55 +150,55 @@ export async function listCmsBranches(): Promise<string[]> {
   );
 }
 
-// ---------------------------------------------------------------------------
-// listPostsWithContent — 1~2 API calls instead of N+1
-// ---------------------------------------------------------------------------
-export async function listPostsWithContent(): Promise<
-  { file: GitHubFile; content: string }[]
-> {
-  // Fetch the tree to get current state
+function isTopLevelPostMarkdown(path: string): boolean {
+  return (
+    path.startsWith("posts/") &&
+    path.endsWith(".md") &&
+    !path.includes("/", 6)
+  );
+}
+
+async function getPostTree(
+  ref: string
+): Promise<{ treeSha: string; entries: GitHubTreeEntry[] }> {
   const treeRes = await fetch(
-    `${API_BASE}/git/trees/main?recursive=1`,
+    `${API_BASE}/git/trees/${encodeURIComponent(ref)}?recursive=1`,
     { headers: headers(), cache: "no-store" }
   );
   if (!treeRes.ok) {
     throw new Error(`GitHub API error: ${treeRes.status} ${await treeRes.text()}`);
   }
-  const treeData = await treeRes.json();
-  const treeSha: string = treeData.sha;
 
-  // If cache is fresh and tree hasn't changed, return cached
-  if (
-    postsCache &&
-    postsCache.treeSha === treeSha &&
-    Date.now() - postsCache.timestamp < CACHE_TTL_MS
-  ) {
-    return postsCache.posts;
+  const treeData = await treeRes.json();
+  const entries = treeData.tree.filter(
+    (entry: GitHubTreeEntry) =>
+      entry.type === "blob" && isTopLevelPostMarkdown(entry.path)
+  );
+
+  return { treeSha: treeData.sha, entries };
+}
+
+async function getBlobContent(sha: string): Promise<string> {
+  const blobRes = await fetch(`${API_BASE}/git/blobs/${sha}`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  if (!blobRes.ok) {
+    throw new Error(`GitHub Blob API error: ${blobRes.status}`);
   }
 
-  // Filter to posts/*.md
-  const mdEntries: { path: string; sha: string; size: number }[] =
-    treeData.tree.filter(
-      (e: { path: string; type: string }) =>
-        e.type === "blob" &&
-        e.path.startsWith("posts/") &&
-        e.path.endsWith(".md") &&
-        !e.path.includes("/", 6) // only top-level in posts/
-    );
+  const blob = await blobRes.json();
+  return Buffer.from(blob.content, "base64").toString("utf-8");
+}
 
-  // Fetch blob contents in parallel
-  const posts = await Promise.all(
-    mdEntries.map(async (entry) => {
-      const blobRes = await fetch(`${API_BASE}/git/blobs/${entry.sha}`, {
-        headers: headers(),
-        cache: "no-store",
-      });
-      if (!blobRes.ok) {
-        throw new Error(`GitHub Blob API error: ${blobRes.status}`);
-      }
-      const blob = await blobRes.json();
-      const content = Buffer.from(blob.content, "base64").toString("utf-8");
+async function hydratePosts(
+  entries: GitHubTreeEntry[]
+): Promise<{ file: GitHubFile; content: string }[]> {
+  return Promise.all(
+    entries.map(async (entry) => {
+      const content = await getBlobContent(entry.sha);
       const name = entry.path.split("/").pop()!;
+
       return {
         file: {
           name,
@@ -204,9 +211,44 @@ export async function listPostsWithContent(): Promise<
       };
     })
   );
+}
+
+// ---------------------------------------------------------------------------
+// listPostsWithContent — 1~2 API calls instead of N+1
+// ---------------------------------------------------------------------------
+export async function listPostsWithContent(): Promise<
+  { file: GitHubFile; content: string }[]
+> {
+  const { treeSha, entries } = await getPostTree("main");
+
+  // If cache is fresh and tree hasn't changed, return cached
+  if (
+    postsCache &&
+    postsCache.treeSha === treeSha &&
+    Date.now() - postsCache.timestamp < CACHE_TTL_MS
+  ) {
+    return postsCache.posts;
+  }
+
+  const posts = await hydratePosts(entries);
 
   postsCache = { posts, treeSha, timestamp: Date.now() };
   return posts;
+}
+
+export async function listCmsPostsWithContent(): Promise<
+  { branch: string; file: GitHubFile; content: string }[]
+> {
+  const branches = await listCmsBranches();
+  const postsByBranch = await Promise.all(
+    branches.map(async (branch) => {
+      const { entries } = await getPostTree(branch);
+      const posts = await hydratePosts(entries);
+      return posts.map((post) => ({ branch, ...post }));
+    })
+  );
+
+  return postsByBranch.flat();
 }
 
 // ---------------------------------------------------------------------------

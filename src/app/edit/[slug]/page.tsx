@@ -15,6 +15,15 @@ interface PostData {
   sha: string;
 }
 
+function getBranchCandidates(slug: string): string[] {
+  const baseSlug = slug.replace(/^wip_/, "");
+  const candidates = slug.startsWith("wip_")
+    ? [`cms/${slug}`, `cms/${baseSlug}`]
+    : [`cms/${slug}`];
+
+  return Array.from(new Set(candidates));
+}
+
 export default function EditPostPage() {
   const router = useRouter();
   const params = useParams();
@@ -27,29 +36,39 @@ export default function EditPostPage() {
 
   useEffect(() => {
     const controller = new AbortController();
+    setLoading(true);
+    setError("");
+    setBranch(undefined);
 
-    // Check if a cms/{slug} branch exists, load from it if so
-    const baseSlug = wasDraft ? slug.replace(/^wip_/, "") : slug;
-    const branchName = `cms/${baseSlug}`;
+    const load = async () => {
+      for (const candidate of getBranchCandidates(slug)) {
+        const res = await fetch(`/api/posts/${slug}.md?branch=${candidate}`, {
+          signal: controller.signal,
+        });
 
-    fetch(`/api/posts/${slug}.md?branch=${branchName}`, { signal: controller.signal })
-      .then((res) => {
         if (res.ok) {
-          setBranch(branchName);
-          return res.json();
+          setBranch(candidate);
+          setData(await res.json());
+          return;
         }
-        // Branch doesn't have this file — fall back to main
-        return fetch(`/api/posts/${slug}.md`, { signal: controller.signal })
-          .then((res2) => {
-            if (!res2.ok) throw new Error(res2.status === 404 ? "post not found" : `${res2.status}`);
-            return res2.json();
-          });
-      })
-      .then((d) => setData(d))
+      }
+
+      const res = await fetch(`/api/posts/${slug}.md`, {
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        throw new Error(res.status === 404 ? "post not found" : `${res.status}`);
+      }
+
+      setData(await res.json());
+    };
+
+    load()
       .catch((e) => {
         if (e.name !== "AbortError") setError(e.message);
       })
       .finally(() => setLoading(false));
+
     return () => controller.abort();
   }, [slug, wasDraft]);
 

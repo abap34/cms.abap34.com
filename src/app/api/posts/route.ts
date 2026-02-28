@@ -1,11 +1,36 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { listPostsWithContent, createPost, getOrCreateBranch } from "@/lib/github";
+import {
+  listPostsWithContent,
+  listCmsPostsWithContent,
+  createPost,
+  getOrCreateBranch,
+} from "@/lib/github";
 import {
   parseFrontMatter,
   generateFrontMatter,
   slugFromPath,
 } from "@/lib/frontmatter";
+
+function toPostSummary(
+  file: { path: string; sha: string; name: string },
+  content: string,
+  options?: { draft?: boolean }
+) {
+  const { meta } = parseFrontMatter(content);
+
+  return {
+    path: file.path,
+    slug: slugFromPath(file.path),
+    sha: file.sha,
+    title: meta.title || slugFromPath(file.path),
+    date: meta.date || "",
+    tag: meta.tag || [],
+    description: meta.description || "",
+    featured: meta.featured || false,
+    draft: options?.draft ?? file.name.startsWith("wip_"),
+  };
+}
 
 export async function GET() {
   const session = await auth();
@@ -14,22 +39,28 @@ export async function GET() {
   }
 
   try {
-    const filesWithContent = await listPostsWithContent();
+    const [publishedFiles, cmsFiles] = await Promise.all([
+      listPostsWithContent(),
+      listCmsPostsWithContent(),
+    ]);
 
-    const posts = filesWithContent.map(({ file, content }) => {
-      const { meta } = parseFrontMatter(content);
-      return {
-        path: file.path,
-        slug: slugFromPath(file.path),
-        sha: file.sha,
-        title: meta.title || slugFromPath(file.path),
-        date: meta.date || "",
-        tag: meta.tag || [],
-        description: meta.description || "",
-        featured: meta.featured || false,
-        draft: file.name.startsWith("wip_"),
-      };
-    });
+    const publishedPosts = publishedFiles.map(({ file, content }) =>
+      toPostSummary(file, content)
+    );
+    const publishedPaths = new Set(publishedPosts.map((post) => post.path));
+
+    const unpublishedOnlyPosts = Array.from(
+      new Map(
+        cmsFiles
+          .filter(({ file }) => !publishedPaths.has(file.path))
+          .map(({ file, content }) => [
+            file.path,
+            toPostSummary(file, content, { draft: true }),
+          ])
+      ).values()
+    );
+
+    const posts = [...publishedPosts, ...unpublishedOnlyPosts];
 
     posts.sort((a, b) => (a.date > b.date ? -1 : 1));
 
