@@ -24,24 +24,12 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/posts").then((res) => {
+    fetch("/api/posts")
+      .then((res) => {
         if (!res.ok) throw new Error(`${res.status}`);
         return res.json();
-      }),
-      fetch("/api/branches").then((res) => {
-        if (!res.ok) return { slugs: [] };
-        return res.json();
-      }),
-    ])
-      .then(([postsData, branchData]) => {
-        const editingSlugs = new Set<string>(branchData.slugs || []);
-        const postsWithEditing = postsData.map((p: Omit<Post, "editing">) => ({
-          ...p,
-          editing: editingSlugs.has(p.slug) || editingSlugs.has(p.slug.replace(/^wip_/, "")),
-        }));
-        setPosts(postsWithEditing);
       })
+      .then((postsData: Post[]) => setPosts(postsData))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);

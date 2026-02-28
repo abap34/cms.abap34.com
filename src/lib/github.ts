@@ -34,11 +34,31 @@ interface PostsCache {
   timestamp: number;
 }
 
+interface CmsPostsCache {
+  cacheKey: string;
+  posts: { branch: string; file: GitHubFile; content: string }[];
+  timestamp: number;
+}
+
+interface GitHubRef {
+  ref: string;
+  object: {
+    sha: string;
+  };
+}
+
+export interface CmsBranchRef {
+  branch: string;
+  sha: string;
+}
+
 let postsCache: PostsCache | null = null;
+let cmsPostsCache: CmsPostsCache | null = null;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export function invalidateCache() {
   postsCache = null;
+  cmsPostsCache = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +156,7 @@ export async function deleteBranch(branch: string): Promise<void> {
   }
 }
 
-export async function listCmsBranches(): Promise<string[]> {
+export async function listCmsBranchRefs(): Promise<CmsBranchRef[]> {
   const res = await fetch(
     `${API_BASE}/git/matching-refs/heads/cms/`,
     { headers: headers(), cache: "no-store" }
@@ -144,10 +164,16 @@ export async function listCmsBranches(): Promise<string[]> {
   if (!res.ok) {
     throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
   }
-  const data = await res.json();
-  return data.map((ref: { ref: string }) =>
-    ref.ref.replace("refs/heads/", "")
-  );
+  const data: GitHubRef[] = await res.json();
+  return data.map((ref) => ({
+    branch: ref.ref.replace("refs/heads/", ""),
+    sha: ref.object.sha,
+  }));
+}
+
+export async function listCmsBranches(): Promise<string[]> {
+  const refs = await listCmsBranchRefs();
+  return refs.map((ref) => ref.branch);
 }
 
 function isTopLevelPostMarkdown(path: string): boolean {
@@ -236,19 +262,36 @@ export async function listPostsWithContent(): Promise<
   return posts;
 }
 
-export async function listCmsPostsWithContent(): Promise<
+export async function listCmsPostsWithContent(
+  branchRefs?: CmsBranchRef[]
+): Promise<
   { branch: string; file: GitHubFile; content: string }[]
 > {
-  const branches = await listCmsBranches();
+  const branches = branchRefs || (await listCmsBranchRefs());
+  const cacheKey = branches
+    .map(({ branch, sha }) => `${branch}:${sha}`)
+    .sort()
+    .join("|");
+
+  if (
+    cmsPostsCache &&
+    cmsPostsCache.cacheKey === cacheKey &&
+    Date.now() - cmsPostsCache.timestamp < CACHE_TTL_MS
+  ) {
+    return cmsPostsCache.posts;
+  }
+
   const postsByBranch = await Promise.all(
-    branches.map(async (branch) => {
+    branches.map(async ({ branch }) => {
       const { entries } = await getPostTree(branch);
       const posts = await hydratePosts(entries);
       return posts.map((post) => ({ branch, ...post }));
     })
   );
 
-  return postsByBranch.flat();
+  const posts = postsByBranch.flat();
+  cmsPostsCache = { cacheKey, posts, timestamp: Date.now() };
+  return posts;
 }
 
 // ---------------------------------------------------------------------------
@@ -299,7 +342,7 @@ export async function createPost(
   if (!res.ok) {
     throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
   }
-  if (!branch || branch === "main") invalidateCache();
+  invalidateCache();
   const data = await res.json();
   return { sha: data.content.sha, commitSha: data.commit.sha };
 }
@@ -324,7 +367,7 @@ export async function updatePost(
   if (!res.ok) {
     throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
   }
-  if (!branch || branch === "main") invalidateCache();
+  invalidateCache();
   const data = await res.json();
   return { sha: data.content.sha, commitSha: data.commit.sha };
 }
@@ -347,7 +390,7 @@ export async function uploadFile(
   if (!res.ok) {
     throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
   }
-  if (!branch || branch === "main") invalidateCache();
+  invalidateCache();
   const data = await res.json();
   return { sha: data.content.sha, commitSha: data.commit.sha };
 }
@@ -370,5 +413,5 @@ export async function deletePost(
   if (!res.ok) {
     throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
   }
-  if (!branch || branch === "main") invalidateCache();
+  invalidateCache();
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import {
   listPostsWithContent,
+  listCmsBranchRefs,
   listCmsPostsWithContent,
   createPost,
   getOrCreateBranch,
@@ -29,6 +30,7 @@ function toPostSummary(
     description: meta.description || "",
     featured: meta.featured || false,
     draft: options?.draft ?? file.name.startsWith("wip_"),
+    editing: false,
   };
 }
 
@@ -39,10 +41,14 @@ export async function GET() {
   }
 
   try {
+    const branchRefs = await listCmsBranchRefs();
     const [publishedFiles, cmsFiles] = await Promise.all([
       listPostsWithContent(),
-      listCmsPostsWithContent(),
+      listCmsPostsWithContent(branchRefs),
     ]);
+    const branchSlugs = new Set(
+      branchRefs.map(({ branch }) => branch.replace(/^cms\//, ""))
+    );
 
     const publishedPosts = publishedFiles.map(({ file, content }) =>
       toPostSummary(file, content)
@@ -55,12 +61,18 @@ export async function GET() {
           .filter(({ file }) => !publishedPaths.has(file.path))
           .map(({ file, content }) => [
             file.path,
-            toPostSummary(file, content, { draft: true }),
+            { ...toPostSummary(file, content, { draft: true }), editing: true },
           ])
       ).values()
     );
 
-    const posts = [...publishedPosts, ...unpublishedOnlyPosts];
+    const posts = [...publishedPosts, ...unpublishedOnlyPosts].map((post) => ({
+      ...post,
+      editing:
+        post.editing ||
+        branchSlugs.has(post.slug) ||
+        branchSlugs.has(post.slug.replace(/^wip_/, "")),
+    }));
 
     posts.sort((a, b) => (a.date > b.date ? -1 : 1));
 
