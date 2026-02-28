@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Preview } from "./Preview";
 
 interface PostEditorProps {
@@ -13,6 +13,7 @@ interface PostEditorProps {
     featured: boolean;
     body: string;
     sha?: string;
+    draft?: boolean;
   };
   slug?: string;
   onSave: (data: {
@@ -25,6 +26,7 @@ interface PostEditorProps {
     featured: boolean;
     content: string;
     sha?: string;
+    draft?: boolean;
   }) => Promise<void>;
 }
 
@@ -45,7 +47,39 @@ export function PostEditor({ initialData, slug: initialSlug, onSave }: PostEdito
   );
   const [ogpUrl, setOgpUrl] = useState(initialData?.ogp_url || "");
   const [featured, setFeatured] = useState(initialData?.featured || false);
+  const [draft, setDraft] = useState(initialData?.draft || false);
   const [body, setBody] = useState(initialData?.body || "");
+  const [uploading, setUploading] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (file: File) => {
+    if (!slug) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("slug", slug);
+      const res = await fetch("/api/images", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      const markdownImg = `![](${data.url})`;
+      const ta = textareaRef.current;
+      if (ta) {
+        const start = ta.selectionStart;
+        const before = body.slice(0, start);
+        const after = body.slice(start);
+        setBody(before + markdownImg + after);
+      } else {
+        setBody(body + "\n" + markdownImg);
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -63,6 +97,7 @@ export function PostEditor({ initialData, slug: initialSlug, onSave }: PostEdito
         featured,
         content: body,
         sha: initialData?.sha,
+        draft,
       });
     } finally {
       setSaving(false);
@@ -94,7 +129,7 @@ export function PostEditor({ initialData, slug: initialSlug, onSave }: PostEdito
           className={inputClass}
         />
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <div>
           <label className="block text-xs text-[var(--text-muted)] mb-1">date</label>
           <input
@@ -113,6 +148,16 @@ export function PostEditor({ initialData, slug: initialSlug, onSave }: PostEdito
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFeatured(e.target.checked)}
             />
             featured
+          </label>
+        </div>
+        <div className="flex items-end pb-0.5">
+          <label className="flex items-center gap-2 text-sm text-amber-600">
+            <input
+              type="checkbox"
+              checked={draft}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft(e.target.checked)}
+            />
+            draft
           </label>
         </div>
       </div>
@@ -150,7 +195,7 @@ export function PostEditor({ initialData, slug: initialSlug, onSave }: PostEdito
 
   const editPanel = (
     <div className="flex-1 flex flex-col overflow-y-auto">
-      <div className="px-3 py-2 border-b border-[var(--border)]">
+      <div className="px-3 py-2 border-b border-[var(--border)] flex items-center gap-3">
         <button
           type="button"
           onClick={() => setShowMeta(!showMeta)}
@@ -158,11 +203,31 @@ export function PostEditor({ initialData, slug: initialSlug, onSave }: PostEdito
         >
           {showMeta ? "- metadata" : "+ metadata"}
         </button>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading || !slug}
+          className="text-xs text-[var(--text-muted)] hover:text-[var(--text)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          title={!slug ? "Set slug first" : "Upload image"}
+        >
+          {uploading ? "uploading..." : "+ img"}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleImageUpload(file);
+          }}
+        />
       </div>
 
       {showMeta && metaFields}
 
       <textarea
+        ref={textareaRef}
         value={body}
         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setBody(e.target.value)}
         className="flex-1 w-full px-4 py-3 text-sm resize-none focus:outline-none bg-[var(--bg)]"

@@ -180,3 +180,43 @@ export async function updatePost(
   const data = await res.json();
   return { sha: data.content.sha, commitSha: data.commit.sha };
 }
+
+export async function uploadFile(
+  path: string,
+  base64Content: string,
+  message?: string
+): Promise<{ sha: string; commitSha: string }> {
+  const res = await fetch(`${API_BASE}/contents/${path}`, {
+    method: "PUT",
+    headers: { ...headers(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message: message || `Upload ${path}`,
+      content: base64Content,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
+  }
+  invalidateCache();
+  const data = await res.json();
+  return { sha: data.content.sha, commitSha: data.commit.sha };
+}
+
+export async function deletePost(
+  path: string,
+  sha: string,
+  message?: string
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/contents/${path}`, {
+    method: "DELETE",
+    headers: { ...headers(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message: message || `Delete ${path}`,
+      sha,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
+  }
+  invalidateCache();
+}

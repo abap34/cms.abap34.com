@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getPost, updatePost } from "@/lib/github";
+import { getPost, updatePost, createPost, deletePost } from "@/lib/github";
 import {
   parseFrontMatter,
   generateFrontMatter,
@@ -90,5 +90,69 @@ export async function PUT(
     const msg = e instanceof Error ? e.message : "Unknown error";
     const status = msg.includes("409") ? 409 : 502;
     return NextResponse.json({ error: msg }, { status });
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string }> }
+) {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { path } = await params;
+  const oldFilePath = `posts/${path}`;
+
+  let reqBody;
+  try {
+    reqBody = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const {
+    newPath,
+    sha,
+    title,
+    date,
+    tag,
+    description,
+    ogp_url,
+    featured,
+    body,
+  } = reqBody;
+
+  if (!sha || !newPath) {
+    return NextResponse.json(
+      { error: "sha and newPath are required" },
+      { status: 400 }
+    );
+  }
+
+  const newFilePath = `posts/${newPath}`;
+  const newSlug = slugFromPath(newFilePath);
+  const markdown = generateFrontMatter(
+    { title, date, tag, description, ogp_url, featured },
+    body || "",
+    newSlug
+  );
+
+  try {
+    // Create the new file
+    const result = await createPost(
+      newFilePath,
+      markdown,
+      `Rename post: ${title}`
+    );
+
+    // Delete the old file
+    await deletePost(oldFilePath, sha, `Remove old file: ${path}`);
+
+    return NextResponse.json({ path: newFilePath, ...result });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    return NextResponse.json({ error: msg }, { status: 502 });
   }
 }
