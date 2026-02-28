@@ -27,6 +27,7 @@ export async function GET() {
         tag: meta.tag || [],
         description: meta.description || "",
         featured: meta.featured || false,
+        draft: file.name.startsWith("wip_"),
       };
     });
 

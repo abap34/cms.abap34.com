@@ -13,6 +13,7 @@ interface Post {
   tag: string[];
   description: string;
   featured: boolean;
+  draft: boolean;
 }
 
 export default function HomePage() {

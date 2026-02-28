@@ -19,6 +19,7 @@ export default function EditPostPage() {
   const router = useRouter();
   const params = useParams();
   const slug = params.slug as string;
+  const wasDraft = slug.startsWith("wip_");
   const [data, setData] = useState<PostData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -48,26 +49,61 @@ export default function EditPostPage() {
     featured: boolean;
     content: string;
     sha?: string;
+    draft?: boolean;
   }) => {
-    const res = await fetch(`/api/posts/${slug}.md`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sha: saveData.sha,
-        title: saveData.title,
-        date: saveData.date,
-        tag: saveData.tag,
-        description: saveData.description,
-        ogp_url: saveData.ogp_url,
-        featured: saveData.featured,
-        body: saveData.content,
-      }),
-    });
+    const isDraft = saveData.draft || false;
+    const draftChanged = wasDraft !== isDraft;
 
-    if (!res.ok) {
-      const err = await res.json();
-      alert(`Error: ${err.error}`);
-      return;
+    if (draftChanged) {
+      // Draft status changed — need to rename (delete old + create new)
+      const newSlug = isDraft
+        ? `wip_${slug}`                          // published → draft
+        : slug.replace(/^wip_/, "");              // draft → published
+      const newPath = `${newSlug}.md`;
+
+      const res = await fetch(`/api/posts/${slug}.md`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          newPath,
+          sha: saveData.sha,
+          title: saveData.title,
+          date: saveData.date,
+          tag: saveData.tag,
+          description: saveData.description,
+          ogp_url: saveData.ogp_url,
+          featured: saveData.featured,
+          body: saveData.content,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`Error: ${err.error}`);
+        return;
+      }
+    } else {
+      // No rename needed — normal update
+      const res = await fetch(`/api/posts/${slug}.md`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sha: saveData.sha,
+          title: saveData.title,
+          date: saveData.date,
+          tag: saveData.tag,
+          description: saveData.description,
+          ogp_url: saveData.ogp_url,
+          featured: saveData.featured,
+          body: saveData.content,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`Error: ${err.error}`);
+        return;
+      }
     }
 
     router.push("/");
@@ -109,7 +145,7 @@ export default function EditPostPage() {
       <div className="flex-1 overflow-hidden">
         {data && (
           <PostEditor
-            initialData={data}
+            initialData={{ ...data, draft: wasDraft }}
             slug={slug}
             onSave={handleSave}
           />

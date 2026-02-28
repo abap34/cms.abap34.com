@@ -15,11 +15,13 @@ export default function NewPostPage() {
     ogp_url: string;
     featured: boolean;
     content: string;
+    draft?: boolean;
   }) => {
+    const slug = data.draft ? `wip_${data.slug}` : data.slug;
     const res = await fetch("/api/posts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ ...data, slug }),
     });
 
     if (!res.ok) {
