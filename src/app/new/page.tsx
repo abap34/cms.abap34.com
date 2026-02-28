@@ -103,6 +103,12 @@ export default function NewPostPage() {
           ← back
         </button>
         <h1 className="font-bold text-sm">new post</h1>
+        <button
+          onClick={() => location.reload()}
+          className="ml-auto text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+        >
+          reload
+        </button>
       </header>
       <div className="flex-1 overflow-hidden">
         <PostEditor onSave={handleSave} onPublish={handlePublish} />

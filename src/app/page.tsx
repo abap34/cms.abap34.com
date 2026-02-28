@@ -53,6 +53,12 @@ export default function HomePage() {
           <h1 className="font-bold text-sm">cms.abap34.com</h1>
           <div className="flex items-center gap-3">
             <button
+              onClick={() => location.reload()}
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--text)]"
+            >
+              reload
+            </button>
+            <button
               onClick={() => router.push("/new")}
               className="text-sm border border-[var(--border)] px-3 py-1 hover:bg-[var(--bg-hover)] transition-colors"
             >
