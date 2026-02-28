@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+:root {
+  --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  --accent: #80bdff;
+  --text: #333;
+  --text-muted: #777;
+  --border: #ddd;
+  --bg: #fff;
+  --bg-hover: #f8f9fa;
+  --tag-bg: #eee;
+}
+
+body {
+  font-family: var(--font-mono);
+  color: var(--text);
+  background-color: var(--bg);
+  line-height: 1.5;
+}

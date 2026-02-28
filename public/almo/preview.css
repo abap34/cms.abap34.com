@@ -1,0 +1,392 @@
+/*
+ * Preview CSS — extracted from abap34.com/assets/style.css
+ * Scoped to .almo-preview to avoid leaking into CMS UI
+ */
+
+.almo-preview {
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+    line-height: 1.5;
+    color: #333;
+    word-wrap: break-word;
+}
+
+/* Headings */
+.almo-preview h1,
+.almo-preview h2,
+.almo-preview h3,
+.almo-preview h4,
+.almo-preview h5,
+.almo-preview h6 {
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+    font-weight: bold;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 0.3rem;
+    color: #333;
+}
+
+.almo-preview h5 {
+    font-size: 1.1rem;
+}
+
+/* Paragraph */
+.almo-preview p {
+    margin-bottom: 1rem;
+}
+
+/* Inline code */
+.almo-preview .inline-code {
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+    background-color: #f6f8fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0rem 0.25rem;
+    font-size: 0.95em;
+    overflow-wrap: break-word;
+    word-break: break-all;
+    white-space: pre-wrap;
+    max-width: 100%;
+    color: #db2955;
+}
+
+/* Lists */
+.almo-preview ul,
+.almo-preview ol,
+.almo-preview dl {
+    margin-left: 2.5rem !important;
+    margin-top: 0.5rem !important;
+    margin-bottom: 0rem !important;
+}
+
+/* Images */
+.almo-preview img,
+.almo-preview video {
+    max-width: 80%;
+    max-height: 80vh;
+    height: auto;
+    display: block;
+    border: 1px solid #ddd;
+    margin: 1rem auto;
+}
+
+/* Tables */
+.almo-preview table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+.almo-preview table thead th {
+    background-color: #f6f8fa;
+    border-bottom: 2px solid #ccc;
+    padding: 0.6rem 0.8rem;
+    text-align: left;
+    font-weight: bold;
+}
+
+.almo-preview table th,
+.almo-preview table td {
+    border: 1px solid #ddd;
+    padding: 0.5rem 0.8rem;
+    vertical-align: top;
+}
+
+.almo-preview table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.almo-preview table tbody tr:hover {
+    background-color: #f0f0f0;
+}
+
+/* Links */
+.almo-preview a {
+    word-break: break-all;
+    color: #80bdff;
+    text-decoration: none;
+}
+
+/* iframe */
+.almo-preview iframe {
+    width: 100%;
+}
+
+/* figure / figcaption */
+.almo-preview figure {
+    margin: 1rem 0;
+}
+
+.almo-preview figcaption {
+    color: #777;
+    display: block;
+    margin-top: 0.5rem;
+    text-align: center;
+}
+
+/* Strong */
+.almo-preview strong {
+    font-weight: 1000;
+}
+
+/* Blockquote */
+.almo-preview blockquote {
+    border-left: 4px solid #ddd;
+    margin: 1rem 0;
+    padding-left: 1rem;
+    color: #353434;
+    background-color: #f9f9f9;
+}
+
+/* Code blocks */
+.almo-preview pre,
+.almo-preview code {
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.almo-preview pre {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.almo-preview pre::-webkit-scrollbar {
+    display: none;
+}
+
+/* Note / Warn / Danger blocks */
+.almo-preview .info {
+    background-color: #f0f0f0;
+    padding: 1rem;
+    border-left: 5px solid #80bdff;
+    margin: 1rem 0;
+}
+
+.almo-preview .warn {
+    background-color: #fff3e0;
+    padding: 1rem;
+    border-left: 5px solid #ffa500;
+    margin: 1rem 0;
+}
+
+.almo-preview .danger {
+    background-color: #ffe7e7;
+    padding: 1rem;
+    border-left: 5px solid #ff4d4f;
+    margin: 1rem 0;
+}
+
+/* Math blocks */
+.almo-preview .theorem,
+.almo-preview .lemma,
+.almo-preview .corollary,
+.almo-preview .proposition,
+.almo-preview .definition,
+.almo-preview .proof {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: none;
+    border: 1px solid #ddd;
+    line-height: 2.0;
+}
+
+.almo-preview .theorem { counter-increment: theorem; }
+.almo-preview .theorem::before {
+    content: "Theorem " counter(theorem) " ";
+    font-weight: bold;
+    color: #333;
+}
+
+.almo-preview .lemma { counter-increment: lemma; }
+.almo-preview .lemma::before {
+    content: "Lemma " counter(lemma) " ";
+    font-weight: bold;
+    color: #333;
+}
+
+.almo-preview .corollary { counter-increment: corollary; }
+.almo-preview .corollary::before {
+    content: "Corollary " counter(corollary) " ";
+    font-weight: bold;
+    color: #333;
+}
+
+.almo-preview .proposition { counter-increment: proposition; }
+.almo-preview .proposition::before {
+    content: "Proposition " counter(proposition) " ";
+    font-weight: bold;
+    color: #333;
+}
+
+.almo-preview .definition { counter-increment: definition; }
+.almo-preview .definition::before {
+    content: "Definition " counter(definition) " ";
+    font-weight: bold;
+    color: #333;
+}
+
+.almo-preview .proof { counter-increment: proof; }
+.almo-preview .proof::before {
+    content: "Proof ";
+    font-weight: bold;
+    color: #333;
+}
+
+.almo-preview .theorem p:last-child,
+.almo-preview .lemma p:last-child,
+.almo-preview .corollary p:last-child,
+.almo-preview .proposition p:last-child,
+.almo-preview .definition p:last-child,
+.almo-preview .proof p:last-child {
+    margin-bottom: 0;
+}
+
+/* Math */
+.almo-preview .math-block {
+    overflow-x: auto;
+    overflow-y: hidden;
+    font-size: 0.85em;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.almo-preview .math-block::-webkit-scrollbar {
+    display: none;
+}
+
+.almo-preview .math-inline {
+    display: inline-grid;
+    overflow: hidden !important;
+    font-size: 0.85em;
+    max-width: 100%;
+}
+
+/* Decoration spans */
+.almo-preview .dot-over {
+    -webkit-text-emphasis: filled;
+    text-emphasis: filled;
+    -webkit-text-emphasis-color: #ff9800;
+    text-emphasis-color: #ff9800;
+    -webkit-text-emphasis-style: circle;
+    text-emphasis-style: circle;
+    font-weight: bold;
+}
+
+.almo-preview .wave-underline {
+    text-decoration: underline wavy;
+    text-decoration-color: #80bdff;
+    text-decoration-thickness: 0.15em;
+    text-underline-offset: 0.1em;
+}
+
+/* Footnotes */
+.almo-preview .footnote-ref {
+    font-size: 0.8em;
+    vertical-align: super;
+    color: #777;
+}
+
+.almo-preview .footnote-ref a {
+    color: #777;
+    text-decoration: none;
+}
+
+.almo-preview .footnotes {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    font-size: 0.9em;
+}
+
+.almo-preview .footnote-def {
+    margin-bottom: 0.5rem;
+    padding: 0.2rem 0.5rem;
+    border-left: 3px solid #ddd;
+    display: block;
+}
+
+.almo-preview .footnote-def p {
+    margin-bottom: 0;
+}
+
+/* OGP link cards */
+.almo-preview .link-card {
+    margin: 16px 0;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    max-width: 600px;
+}
+
+.almo-preview .link-card:hover {
+    border-color: #80bdff;
+}
+
+.almo-preview .link-card-container {
+    display: flex;
+    text-decoration: none;
+    color: inherit;
+    height: 140px;
+}
+
+.almo-preview .link-card-image {
+    flex: 0 0 220px;
+    max-width: 100%;
+    background: #f5f5f5;
+    position: relative;
+    overflow: hidden;
+}
+
+.almo-preview .link-card-image img {
+    max-width: 100%;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center top;
+    display: block;
+    background: #f5f5f5;
+    border: none;
+    margin: 0;
+}
+
+.almo-preview .link-card-content {
+    flex: 1;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.almo-preview .link-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    color: #333;
+    line-height: 1.3;
+}
+
+.almo-preview .link-card-description {
+    font-size: 11px;
+    color: #777;
+    margin: 0 0 auto 0;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.almo-preview .link-card-url {
+    font-size: 9px;
+    color: #999;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
