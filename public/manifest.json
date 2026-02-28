@@ -1,0 +1,17 @@
+{
+  "name": "cms.abap34.com",
+  "short_name": "cms",
+  "description": "Blog CMS for abap34.com",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
