@@ -34,8 +34,8 @@ interface PostsCache {
   timestamp: number;
 }
 
-interface CmsPostsCache {
-  cacheKey: string;
+interface CmsBranchPostsCache {
+  sha: string;
   posts: { branch: string; file: GitHubFile; content: string }[];
   timestamp: number;
 }
@@ -53,12 +53,11 @@ export interface CmsBranchRef {
 }
 
 let postsCache: PostsCache | null = null;
-let cmsPostsCache: CmsPostsCache | null = null;
+let cmsPostsCache: Record<string, CmsBranchPostsCache> = {};
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export function invalidateCache() {
   postsCache = null;
-  cmsPostsCache = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -268,30 +267,35 @@ export async function listCmsPostsWithContent(
   { branch: string; file: GitHubFile; content: string }[]
 > {
   const branches = branchRefs || (await listCmsBranchRefs());
-  const cacheKey = branches
-    .map(({ branch, sha }) => `${branch}:${sha}`)
-    .sort()
-    .join("|");
-
-  if (
-    cmsPostsCache &&
-    cmsPostsCache.cacheKey === cacheKey &&
-    Date.now() - cmsPostsCache.timestamp < CACHE_TTL_MS
-  ) {
-    return cmsPostsCache.posts;
-  }
+  const now = Date.now();
+  const nextCache: Record<string, CmsBranchPostsCache> = {};
 
   const postsByBranch = await Promise.all(
-    branches.map(async ({ branch }) => {
+    branches.map(async ({ branch, sha }) => {
+      const cached = cmsPostsCache[branch];
+      if (
+        cached &&
+        cached.sha === sha &&
+        now - cached.timestamp < CACHE_TTL_MS
+      ) {
+        nextCache[branch] = cached;
+        return cached.posts;
+      }
+
       const { entries } = await getPostTree(branch);
       const posts = await hydratePosts(entries);
-      return posts.map((post) => ({ branch, ...post }));
+      const branchPosts = posts.map((post) => ({ branch, ...post }));
+      nextCache[branch] = {
+        sha,
+        posts: branchPosts,
+        timestamp: now,
+      };
+      return branchPosts;
     })
   );
 
-  const posts = postsByBranch.flat();
-  cmsPostsCache = { cacheKey, posts, timestamp: Date.now() };
-  return posts;
+  cmsPostsCache = nextCache;
+  return postsByBranch.flat();
 }
 
 // ---------------------------------------------------------------------------

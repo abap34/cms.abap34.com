@@ -41,9 +41,10 @@ export async function GET() {
   }
 
   try {
+    const publishedFilesPromise = listPostsWithContent();
     const branchRefs = await listCmsBranchRefs();
     const [publishedFiles, cmsFiles] = await Promise.all([
-      listPostsWithContent(),
+      publishedFilesPromise,
       listCmsPostsWithContent(branchRefs),
     ]);
     const branchSlugs = new Set(
