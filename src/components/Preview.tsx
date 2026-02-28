@@ -11,12 +11,25 @@ interface AlmoModule {
   _free: (ptr: number) => void;
 }
 
+declare global {
+  interface Window {
+    MathJax?: {
+      typesetPromise?: (elements?: HTMLElement[]) => Promise<void>;
+      startup?: { promise: Promise<void> };
+    };
+    hljs?: {
+      highlightElement: (el: HTMLElement) => void;
+    };
+  }
+}
+
 interface PreviewProps {
   markdown: string;
 }
 
 let modulePromise: Promise<AlmoModule> | null = null;
 let cssLoaded = false;
+let externalScriptsLoaded = false;
 
 function loadPreviewCSS() {
   if (cssLoaded) return;
@@ -25,6 +38,42 @@ function loadPreviewCSS() {
   link.rel = "stylesheet";
   link.href = "/almo/preview.css";
   document.head.appendChild(link);
+}
+
+function loadExternalScripts() {
+  if (externalScriptsLoaded) return;
+  externalScriptsLoaded = true;
+
+  // MathJax
+  const mathjax = document.createElement("script");
+  mathjax.id = "MathJax-script";
+  mathjax.async = true;
+  mathjax.src = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js";
+  document.head.appendChild(mathjax);
+
+  // highlight.js CSS
+  const hljsCss = document.createElement("link");
+  hljsCss.rel = "stylesheet";
+  hljsCss.href = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.0/styles/github.min.css";
+  document.head.appendChild(hljsCss);
+
+  // highlight.js core
+  const hljsScript = document.createElement("script");
+  hljsScript.src = "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.0/highlight.min.js";
+  hljsScript.onload = () => {
+    // Additional languages
+    const langs = ["julia", "julia-repl", "scheme", "dockerfile"];
+    for (const lang of langs) {
+      const s = document.createElement("script");
+      s.src = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.0/languages/${lang}.min.js`;
+      document.head.appendChild(s);
+    }
+    // Lean
+    const lean = document.createElement("script");
+    lean.src = "https://unpkg.com/highlightjs-lean/dist/lean.min.js";
+    document.head.appendChild(lean);
+  };
+  document.head.appendChild(hljsScript);
 }
 
 function loadAlmoModule(): Promise<AlmoModule> {
@@ -55,6 +104,7 @@ export function Preview({ markdown }: PreviewProps) {
 
   useEffect(() => {
     loadPreviewCSS();
+    loadExternalScripts();
     loadAlmoModule()
       .then((mod) => {
         moduleRef.current = mod;
@@ -103,8 +153,29 @@ export function Preview({ markdown }: PreviewProps) {
     };
   }, [markdown, render]);
 
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  // Run MathJax and highlight.js after HTML is rendered
+  useEffect(() => {
+    if (!html || !previewRef.current) return;
+
+    // highlight.js
+    if (window.hljs) {
+      previewRef.current.querySelectorAll<HTMLElement>("pre code").forEach((el) => {
+        window.hljs!.highlightElement(el);
+      });
+    }
+
+    // MathJax
+    if (window.MathJax?.typesetPromise) {
+      window.MathJax.typesetPromise([previewRef.current]).catch(() => {
+        // ignore MathJax errors
+      });
+    }
+  }, [html]);
+
   return (
-    <div className="almo-preview">
+    <div className="almo-preview" ref={previewRef}>
       {wasmAvailable === false && (
         <p className="text-xs text-amber-600 mb-2">
           almo wasm が読み込めません。プレーンテキストで表示しています。
