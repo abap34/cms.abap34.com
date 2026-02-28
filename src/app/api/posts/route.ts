@@ -13,25 +13,30 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const filesWithContent = await listPostsWithContent();
+  try {
+    const filesWithContent = await listPostsWithContent();
 
-  const posts = filesWithContent.map(({ file, content }) => {
-    const { meta } = parseFrontMatter(content);
-    return {
-      path: file.path,
-      slug: slugFromPath(file.path),
-      sha: file.sha,
-      title: meta.title || slugFromPath(file.path),
-      date: meta.date || "",
-      tag: meta.tag || [],
-      description: meta.description || "",
-      featured: meta.featured || false,
-    };
-  });
+    const posts = filesWithContent.map(({ file, content }) => {
+      const { meta } = parseFrontMatter(content);
+      return {
+        path: file.path,
+        slug: slugFromPath(file.path),
+        sha: file.sha,
+        title: meta.title || slugFromPath(file.path),
+        date: meta.date || "",
+        tag: meta.tag || [],
+        description: meta.description || "",
+        featured: meta.featured || false,
+      };
+    });
 
-  posts.sort((a, b) => (a.date > b.date ? -1 : 1));
+    posts.sort((a, b) => (a.date > b.date ? -1 : 1));
 
-  return NextResponse.json(posts);
+    return NextResponse.json(posts);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    return NextResponse.json({ error: msg }, { status: 502 });
+  }
 }
 
 export async function POST(request: Request) {
@@ -40,13 +45,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
   const { slug, title, date, tag, description, ogp_url, featured, content } =
     body;
 
   if (!slug || !title) {
     return NextResponse.json(
       { error: "slug and title are required" },
+      { status: 400 }
+    );
+  }
+
+  if (!/^[a-zA-Z0-9_-]+$/.test(slug)) {
+    return NextResponse.json(
+      { error: "slug must be alphanumeric (hyphens and underscores allowed)" },
       { status: 400 }
     );
   }
@@ -58,7 +76,11 @@ export async function POST(request: Request) {
     slug
   );
 
-  const result = await createPost(path, markdown, `Add post: ${title}`);
-
-  return NextResponse.json({ path, ...result });
+  try {
+    const result = await createPost(path, markdown, `Add post: ${title}`);
+    return NextResponse.json({ path, ...result });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    return NextResponse.json({ error: msg }, { status: 502 });
+  }
 }

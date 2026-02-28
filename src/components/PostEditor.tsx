@@ -79,7 +79,7 @@ export function PostEditor({ initialData, slug: initialSlug, onSave }: PostEdito
           <input
             type="text"
             value={slug}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSlug(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSlug(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ""))}
             className={inputClass}
             placeholder="my-post-slug"
           />

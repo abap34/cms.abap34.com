@@ -21,12 +21,21 @@ export default function EditPostPage() {
   const slug = params.slug as string;
   const [data, setData] = useState<PostData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch(`/api/posts/${slug}.md`)
-      .then((res) => res.json())
+    const controller = new AbortController();
+    fetch(`/api/posts/${slug}.md`, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error(res.status === 404 ? "post not found" : `${res.status}`);
+        return res.json();
+      })
       .then((d) => setData(d))
+      .catch((e) => {
+        if (e.name !== "AbortError") setError(e.message);
+      })
       .finally(() => setLoading(false));
+    return () => controller.abort();
   }, [slug]);
 
   const handleSave = async (saveData: {
@@ -68,6 +77,20 @@ export default function EditPostPage() {
     return (
       <div className="h-screen flex items-center justify-center">
         <p className="text-sm text-[var(--text-muted)]">loading...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center gap-3">
+        <p className="text-sm text-red-500">{error}</p>
+        <button
+          onClick={() => router.push("/")}
+          className="text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
+        >
+          ← back
+        </button>
       </div>
     );
   }

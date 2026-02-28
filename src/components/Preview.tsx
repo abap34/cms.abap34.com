@@ -69,13 +69,17 @@ export function Preview({ markdown }: PreviewProps) {
     async (md: string) => {
       const mod = moduleRef.current;
       if (mod) {
-        const byteLen = mod.lengthBytesUTF8(md) + 1;
-        const ptr = mod._malloc(byteLen);
-        mod.stringToUTF8(md, ptr, byteLen);
-        const resultPtr = mod.cwrap("almo_render", "number", ["number", "number"])(ptr, byteLen - 1) as number;
-        const result = mod.UTF8ToString(resultPtr);
-        mod._free(ptr);
-        return result;
+        try {
+          const byteLen = mod.lengthBytesUTF8(md) + 1;
+          const ptr = mod._malloc(byteLen);
+          mod.stringToUTF8(md, ptr, byteLen);
+          const resultPtr = mod.cwrap("almo_render", "number", ["number", "number"])(ptr, byteLen - 1) as number;
+          const result = mod.UTF8ToString(resultPtr);
+          mod._free(ptr);
+          return result;
+        } catch {
+          // fall through to plain text
+        }
       }
       const escaped = md
         .replace(/&/g, "&amp;")

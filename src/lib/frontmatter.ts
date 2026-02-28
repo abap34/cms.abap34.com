@@ -52,16 +52,17 @@ function parseYaml(lines: string[]): Record<string, unknown> {
   const result: Record<string, unknown> = {};
 
   for (const line of lines) {
-    const match = line.match(/^(\w+):\s*(.*)/);
+    const match = line.match(/^([\w-]+):\s*(.*)/);
     if (!match) continue;
 
     const [, key, rawValue] = match;
     let value: unknown = rawValue;
 
-    // Inline array: [item1, item2]
-    const arrayMatch = rawValue.match(/^\[(.+)\]$/);
+    // Inline array: [item1, item2] or []
+    const arrayMatch = rawValue.match(/^\[(.*)\]$/);
     if (arrayMatch) {
-      value = arrayMatch[1].split(",").map((s) => s.trim());
+      const inner = arrayMatch[1].trim();
+      value = inner ? inner.split(",").map((s) => s.trim()) : [];
     }
     // Boolean
     else if (rawValue === "true") {

@@ -18,16 +18,23 @@ export async function GET(
 
   const { path } = await params;
   const filePath = `posts/${path}`;
-  const { content, sha } = await getPost(filePath);
-  const { meta, body } = parseFrontMatter(content);
 
-  return NextResponse.json({
-    path: filePath,
-    slug: slugFromPath(filePath),
-    sha,
-    ...meta,
-    body,
-  });
+  try {
+    const { content, sha } = await getPost(filePath);
+    const { meta, body } = parseFrontMatter(content);
+
+    return NextResponse.json({
+      path: filePath,
+      slug: slugFromPath(filePath),
+      sha,
+      ...meta,
+      body,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    const status = msg.includes("404") ? 404 : 502;
+    return NextResponse.json({ error: msg }, { status });
+  }
 }
 
 export async function PUT(
@@ -41,7 +48,14 @@ export async function PUT(
 
   const { path } = await params;
   const filePath = `posts/${path}`;
-  const reqBody = await request.json();
+
+  let reqBody;
+  try {
+    reqBody = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
   const {
     sha,
     title,
@@ -64,12 +78,17 @@ export async function PUT(
     slug
   );
 
-  const result = await updatePost(
-    filePath,
-    markdown,
-    sha,
-    `Update post: ${title}`
-  );
-
-  return NextResponse.json({ path: filePath, ...result });
+  try {
+    const result = await updatePost(
+      filePath,
+      markdown,
+      sha,
+      `Update post: ${title}`
+    );
+    return NextResponse.json({ path: filePath, ...result });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    const status = msg.includes("409") ? 409 : 502;
+    return NextResponse.json({ error: msg }, { status });
+  }
 }

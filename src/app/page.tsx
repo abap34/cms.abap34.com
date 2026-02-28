@@ -18,12 +18,17 @@ interface Post {
 export default function HomePage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const router = useRouter();
 
   useEffect(() => {
     fetch("/api/posts")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`${res.status}`);
+        return res.json();
+      })
       .then(setPosts)
+      .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
 
@@ -52,6 +57,8 @@ export default function HomePage() {
       <main className="max-w-2xl mx-auto px-4 py-6">
         {loading ? (
           <p className="text-sm text-[var(--text-muted)] py-8">loading...</p>
+        ) : error ? (
+          <p className="text-sm text-red-500 py-8">error: {error}</p>
         ) : posts.length === 0 ? (
           <p className="text-sm text-[var(--text-muted)] py-8">no posts yet</p>
         ) : (
