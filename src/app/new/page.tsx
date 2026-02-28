@@ -15,13 +15,73 @@ export default function NewPostPage() {
     ogp_url: string;
     featured: boolean;
     content: string;
+    sha?: string;
     draft?: boolean;
-  }) => {
+    branch?: string;
+  }): Promise<{ sha?: string; branch?: string } | void> => {
     const slug = data.draft ? `wip_${data.slug}` : data.slug;
+
+    if (data.sha && data.branch) {
+      // Already saved once — update on branch
+      const res = await fetch(`/api/posts/${slug}.md`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sha: data.sha,
+          title: data.title,
+          date: data.date,
+          tag: data.tag,
+          description: data.description,
+          ogp_url: data.ogp_url,
+          featured: data.featured,
+          body: data.content,
+          branch: data.branch,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`Error: ${err.error}`);
+        return;
+      }
+      const result = await res.json();
+      return { sha: result.sha, branch: data.branch };
+    }
+
+    // First save — creates branch + file
     const res = await fetch("/api/posts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...data, slug }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      alert(`Error: ${err.error}`);
+      return;
+    }
+
+    const result = await res.json();
+    return { sha: result.sha, branch: result.branch };
+  };
+
+  const handlePublish = async (data: {
+    slug: string;
+    title: string;
+    branch?: string;
+  }) => {
+    if (!data.branch) {
+      alert("Save first before publishing");
+      return;
+    }
+
+    const slug = data.slug;
+    const res = await fetch(`/api/posts/${slug}.md/publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        branch: data.branch,
+        title: `Add: ${data.title}`,
+      }),
     });
 
     if (!res.ok) {
@@ -45,7 +105,7 @@ export default function NewPostPage() {
         <h1 className="font-bold text-sm">new post</h1>
       </header>
       <div className="flex-1 overflow-hidden">
-        <PostEditor onSave={handleSave} />
+        <PostEditor onSave={handleSave} onPublish={handlePublish} />
       </div>
     </div>
   );

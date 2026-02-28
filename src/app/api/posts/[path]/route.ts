@@ -8,7 +8,7 @@ import {
 } from "@/lib/frontmatter";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ path: string }> }
 ) {
   const session = await auth();
@@ -18,9 +18,10 @@ export async function GET(
 
   const { path } = await params;
   const filePath = `posts/${path}`;
+  const branch = request.nextUrl.searchParams.get("branch") || undefined;
 
   try {
-    const { content, sha } = await getPost(filePath);
+    const { content, sha } = await getPost(filePath, branch);
     const { meta, body } = parseFrontMatter(content);
 
     return NextResponse.json({
@@ -65,6 +66,7 @@ export async function PUT(
     ogp_url,
     featured,
     body,
+    branch,
   } = reqBody;
 
   if (!sha) {
@@ -83,7 +85,8 @@ export async function PUT(
       filePath,
       markdown,
       sha,
-      `Update post: ${title}`
+      `Update post: ${title}`,
+      branch
     );
     return NextResponse.json({ path: filePath, ...result });
   } catch (e) {
@@ -122,6 +125,7 @@ export async function PATCH(
     ogp_url,
     featured,
     body,
+    branch,
   } = reqBody;
 
   if (!sha || !newPath) {
@@ -144,11 +148,12 @@ export async function PATCH(
     const result = await createPost(
       newFilePath,
       markdown,
-      `Rename post: ${title}`
+      `Rename post: ${title}`,
+      branch
     );
 
     // Delete the old file
-    await deletePost(oldFilePath, sha, `Remove old file: ${path}`);
+    await deletePost(oldFilePath, sha, `Remove old file: ${path}`, branch);
 
     return NextResponse.json({ path: newFilePath, ...result });
   } catch (e) {

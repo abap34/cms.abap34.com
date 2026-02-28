@@ -12,6 +12,7 @@ interface Post {
   description: string;
   featured: boolean;
   draft: boolean;
+  editing: boolean;
 }
 
 type Filter = "all" | "published" | "drafts";
@@ -63,6 +64,11 @@ export function PostList({ posts }: { posts: Post[] }) {
                   {post.draft && (
                     <span className="ml-2 text-xs font-normal text-amber-600 border border-amber-400 px-1.5 py-0.5 align-middle">
                       draft
+                    </span>
+                  )}
+                  {post.editing && (
+                    <span className="ml-2 text-xs font-normal text-blue-500 border border-blue-400 px-1.5 py-0.5 align-middle">
+                      editing
                     </span>
                   )}
                 </h2>

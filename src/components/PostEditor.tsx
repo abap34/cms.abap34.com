@@ -16,6 +16,7 @@ interface PostEditorProps {
     draft?: boolean;
   };
   slug?: string;
+  branch?: string;
   onSave: (data: {
     slug: string;
     title: string;
@@ -27,13 +28,27 @@ interface PostEditorProps {
     content: string;
     sha?: string;
     draft?: boolean;
+    branch?: string;
+  }) => Promise<{ sha?: string; branch?: string } | void>;
+  onPublish?: (data: {
+    slug: string;
+    title: string;
+    date: string;
+    tag: string[];
+    description: string;
+    ogp_url: string;
+    featured: boolean;
+    content: string;
+    sha?: string;
+    branch?: string;
   }) => Promise<void>;
 }
 
-export function PostEditor({ initialData, slug: initialSlug, onSave }: PostEditorProps) {
+export function PostEditor({ initialData, slug: initialSlug, branch: initialBranch, onSave, onPublish }: PostEditorProps) {
   const [tab, setTab] = useState<"edit" | "preview">("edit");
   const [showMeta, setShowMeta] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [slug, setSlug] = useState(initialSlug || "");
   const [title, setTitle] = useState(initialData?.title || "");
   const [date, setDate] = useState(
@@ -50,6 +65,8 @@ export function PostEditor({ initialData, slug: initialSlug, onSave }: PostEdito
   const [draft, setDraft] = useState(initialData?.draft || false);
   const [body, setBody] = useState(initialData?.body || "");
   const [uploading, setUploading] = useState(false);
+  const [currentSha, setCurrentSha] = useState(initialData?.sha);
+  const [currentBranch, setCurrentBranch] = useState(initialBranch);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -60,6 +77,7 @@ export function PostEditor({ initialData, slug: initialSlug, onSave }: PostEdito
       const formData = new FormData();
       formData.append("file", file);
       formData.append("slug", slug);
+      if (currentBranch) formData.append("branch", currentBranch);
       const res = await fetch("/api/images", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upload failed");
@@ -81,26 +99,53 @@ export function PostEditor({ initialData, slug: initialSlug, onSave }: PostEdito
     }
   };
 
+  const buildData = () => ({
+    slug,
+    title,
+    date,
+    tag: tagStr
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    description,
+    ogp_url: ogpUrl,
+    featured,
+    content: body,
+    sha: currentSha,
+    draft,
+    branch: currentBranch,
+  });
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onSave({
-        slug,
-        title,
-        date,
-        tag: tagStr
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-        description,
-        ogp_url: ogpUrl,
-        featured,
-        content: body,
-        sha: initialData?.sha,
-        draft,
-      });
+      const result = await onSave(buildData());
+      if (result) {
+        if (result.sha) setCurrentSha(result.sha);
+        if (result.branch) setCurrentBranch(result.branch);
+      }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!onPublish) return;
+    setPublishing(true);
+    try {
+      // Save first, then publish
+      const result = await onSave(buildData());
+      if (result) {
+        if (result.sha) setCurrentSha(result.sha);
+        if (result.branch) setCurrentBranch(result.branch);
+      }
+      await onPublish({
+        ...buildData(),
+        sha: result?.sha || currentSha,
+        branch: result?.branch || currentBranch,
+      });
+    } finally {
+      setPublishing(false);
     }
   };
 
@@ -222,6 +267,11 @@ export function PostEditor({ initialData, slug: initialSlug, onSave }: PostEdito
             if (file) handleImageUpload(file);
           }}
         />
+        {currentBranch && (
+          <span className="text-xs text-blue-500 ml-auto">
+            {currentBranch}
+          </span>
+        )}
       </div>
 
       {showMeta && metaFields}
@@ -291,15 +341,24 @@ export function PostEditor({ initialData, slug: initialSlug, onSave }: PostEdito
         {tab === "edit" ? editPanel : previewPanel}
       </div>
 
-      {/* Save button */}
-      <div className="sticky bottom-0 bg-[var(--bg)] border-t border-[var(--border)] p-4">
+      {/* Save / Publish buttons */}
+      <div className="sticky bottom-0 bg-[var(--bg)] border-t border-[var(--border)] p-4 flex gap-3">
         <button
           onClick={handleSave}
-          disabled={saving || !slug || !title}
-          className="w-full border border-[var(--text)] text-[var(--text)] py-2.5 text-sm hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          disabled={saving || publishing || !slug || !title}
+          className="flex-1 border border-[var(--text)] text-[var(--text)] py-2.5 text-sm hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
           {saving ? "saving..." : "save"}
         </button>
+        {onPublish && (
+          <button
+            onClick={handlePublish}
+            disabled={saving || publishing || !slug || !title}
+            className="flex-1 bg-[var(--text)] text-[var(--bg)] py-2.5 text-sm hover:opacity-80 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            {publishing ? "publishing..." : "publish"}
+          </button>
+        )}
       </div>
     </div>
   );

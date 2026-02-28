@@ -35,18 +35,116 @@ export function invalidateCache() {
 }
 
 // ---------------------------------------------------------------------------
+// Branch operations
+// ---------------------------------------------------------------------------
+
+export async function getBranchSha(branch: string): Promise<string | null> {
+  const res = await fetch(`${API_BASE}/git/ref/heads/${branch}`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
+  }
+  const data = await res.json();
+  return data.object.sha;
+}
+
+export async function createBranch(
+  branch: string,
+  fromSha: string
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/git/refs`, {
+    method: "POST",
+    headers: { ...headers(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ref: `refs/heads/${branch}`,
+      sha: fromSha,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
+  }
+}
+
+export async function getOrCreateBranch(
+  slug: string
+): Promise<{ branch: string; sha: string }> {
+  const branch = `cms/${slug}`;
+  const existing = await getBranchSha(branch);
+  if (existing) {
+    return { branch, sha: existing };
+  }
+  const mainSha = await getBranchSha("main");
+  if (!mainSha) {
+    throw new Error("Could not find main branch");
+  }
+  await createBranch(branch, mainSha);
+  return { branch, sha: mainSha };
+}
+
+export async function createPR(
+  branch: string,
+  title: string,
+  body?: string
+): Promise<number> {
+  const res = await fetch(`${API_BASE}/pulls`, {
+    method: "POST",
+    headers: { ...headers(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title,
+      body: body || "",
+      head: branch,
+      base: "main",
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
+  }
+  const data = await res.json();
+  return data.number;
+}
+
+export async function mergePR(prNumber: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/pulls/${prNumber}/merge`, {
+    method: "PUT",
+    headers: { ...headers(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      merge_method: "squash",
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
+  }
+}
+
+export async function deleteBranch(branch: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/git/refs/heads/${branch}`, {
+    method: "DELETE",
+    headers: headers(),
+  });
+  if (!res.ok && res.status !== 422) {
+    throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
+  }
+}
+
+export async function listCmsBranches(): Promise<string[]> {
+  const res = await fetch(
+    `${API_BASE}/git/matching-refs/heads/cms/`,
+    { headers: headers(), cache: "no-store" }
+  );
+  if (!res.ok) {
+    throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
+  }
+  const data = await res.json();
+  return data.map((ref: { ref: string }) =>
+    ref.ref.replace("refs/heads/", "")
+  );
+}
+
+// ---------------------------------------------------------------------------
 // listPostsWithContent — 1~2 API calls instead of N+1
-//
-//   1) GET /repos/.../git/trees/main   (recursive)  — 1 call
-//      → filters posts/*.md, gets each blob sha
-//   2) If cache treeSha matches → return cached (0 additional calls)
-//      Otherwise, fetch all blobs in parallel via Blob API
-//      BUT: Trees API already gives us sha, and Contents API for a
-//      directory already returns content for files <1MB. So we use
-//      the Git Blob API which returns base64 content.
-//
-// Net result: page load = 1 call (tree) + 0 if cached, N if cold.
-//             With TTL=5min, typical usage is 1 call per 5 minutes.
 // ---------------------------------------------------------------------------
 export async function listPostsWithContent(): Promise<
   { file: GitHubFile; content: string }[]
@@ -115,17 +213,21 @@ export async function listPostsWithContent(): Promise<
 // Single file operations (used by edit page & writes)
 // ---------------------------------------------------------------------------
 export async function getPost(
-  path: string
+  path: string,
+  ref?: string
 ): Promise<{ content: string; sha: string }> {
-  // Try cache first
-  if (postsCache) {
+  // Try cache first (only for main branch)
+  if (!ref && postsCache) {
     const cached = postsCache.posts.find((p) => p.file.path === path);
     if (cached) {
       return { content: cached.content, sha: cached.file.sha };
     }
   }
 
-  const res = await fetch(`${API_BASE}/contents/${path}`, {
+  const url = ref
+    ? `${API_BASE}/contents/${path}?ref=${ref}`
+    : `${API_BASE}/contents/${path}`;
+  const res = await fetch(url, {
     headers: headers(),
     cache: "no-store",
   });
@@ -140,7 +242,8 @@ export async function getPost(
 export async function createPost(
   path: string,
   content: string,
-  message?: string
+  message?: string,
+  branch?: string
 ): Promise<{ sha: string; commitSha: string }> {
   const res = await fetch(`${API_BASE}/contents/${path}`, {
     method: "PUT",
@@ -148,12 +251,13 @@ export async function createPost(
     body: JSON.stringify({
       message: message || `Add ${path}`,
       content: Buffer.from(content).toString("base64"),
+      ...(branch && { branch }),
     }),
   });
   if (!res.ok) {
     throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
   }
-  invalidateCache();
+  if (!branch || branch === "main") invalidateCache();
   const data = await res.json();
   return { sha: data.content.sha, commitSha: data.commit.sha };
 }
@@ -162,7 +266,8 @@ export async function updatePost(
   path: string,
   content: string,
   sha: string,
-  message?: string
+  message?: string,
+  branch?: string
 ): Promise<{ sha: string; commitSha: string }> {
   const res = await fetch(`${API_BASE}/contents/${path}`, {
     method: "PUT",
@@ -171,12 +276,13 @@ export async function updatePost(
       message: message || `Update ${path}`,
       content: Buffer.from(content).toString("base64"),
       sha,
+      ...(branch && { branch }),
     }),
   });
   if (!res.ok) {
     throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
   }
-  invalidateCache();
+  if (!branch || branch === "main") invalidateCache();
   const data = await res.json();
   return { sha: data.content.sha, commitSha: data.commit.sha };
 }
@@ -184,7 +290,8 @@ export async function updatePost(
 export async function uploadFile(
   path: string,
   base64Content: string,
-  message?: string
+  message?: string,
+  branch?: string
 ): Promise<{ sha: string; commitSha: string }> {
   const res = await fetch(`${API_BASE}/contents/${path}`, {
     method: "PUT",
@@ -192,12 +299,13 @@ export async function uploadFile(
     body: JSON.stringify({
       message: message || `Upload ${path}`,
       content: base64Content,
+      ...(branch && { branch }),
     }),
   });
   if (!res.ok) {
     throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
   }
-  invalidateCache();
+  if (!branch || branch === "main") invalidateCache();
   const data = await res.json();
   return { sha: data.content.sha, commitSha: data.commit.sha };
 }
@@ -205,7 +313,8 @@ export async function uploadFile(
 export async function deletePost(
   path: string,
   sha: string,
-  message?: string
+  message?: string,
+  branch?: string
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/contents/${path}`, {
     method: "DELETE",
@@ -213,10 +322,11 @@ export async function deletePost(
     body: JSON.stringify({
       message: message || `Delete ${path}`,
       sha,
+      ...(branch && { branch }),
     }),
   });
   if (!res.ok) {
     throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
   }
-  invalidateCache();
+  if (!branch || branch === "main") invalidateCache();
 }

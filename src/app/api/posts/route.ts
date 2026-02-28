@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { listPostsWithContent, createPost } from "@/lib/github";
+import { listPostsWithContent, createPost, getOrCreateBranch } from "@/lib/github";
 import {
   parseFrontMatter,
   generateFrontMatter,
@@ -78,8 +78,9 @@ export async function POST(request: Request) {
   );
 
   try {
-    const result = await createPost(path, markdown, `Add post: ${title}`);
-    return NextResponse.json({ path, ...result });
+    const { branch } = await getOrCreateBranch(slug);
+    const result = await createPost(path, markdown, `Add post: ${title}`, branch);
+    return NextResponse.json({ path, branch, ...result });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     return NextResponse.json({ error: msg }, { status: 502 });

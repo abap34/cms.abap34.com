@@ -14,6 +14,7 @@ interface Post {
   description: string;
   featured: boolean;
   draft: boolean;
+  editing: boolean;
 }
 
 export default function HomePage() {
@@ -23,12 +24,24 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    fetch("/api/posts")
-      .then((res) => {
+    Promise.all([
+      fetch("/api/posts").then((res) => {
         if (!res.ok) throw new Error(`${res.status}`);
         return res.json();
+      }),
+      fetch("/api/branches").then((res) => {
+        if (!res.ok) return { slugs: [] };
+        return res.json();
+      }),
+    ])
+      .then(([postsData, branchData]) => {
+        const editingSlugs = new Set<string>(branchData.slugs || []);
+        const postsWithEditing = postsData.map((p: Omit<Post, "editing">) => ({
+          ...p,
+          editing: editingSlugs.has(p.slug) || editingSlugs.has(p.slug.replace(/^wip_/, "")),
+        }));
+        setPosts(postsWithEditing);
       })
-      .then(setPosts)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);

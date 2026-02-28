@@ -17,6 +17,7 @@ export async function POST(request: Request) {
 
   const file = formData.get("file") as File | null;
   const slug = formData.get("slug") as string | null;
+  const branch = formData.get("branch") as string | null;
 
   if (!file || !slug) {
     return NextResponse.json(
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
   try {
     const arrayBuffer = await file.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString("base64");
-    await uploadFile(path, base64, `Upload image: ${filename}`);
+    await uploadFile(path, base64, `Upload image: ${filename}`, branch || undefined);
     const url = `https://abap34.com/posts/${slug}/${filename}`;
     return NextResponse.json({ url });
   } catch (e) {
